@@ -140,50 +140,81 @@ def evaluate_model(model, test_loader, device='cuda'):
     
     return all_preds, all_labels
 
+def load_datasets(data_dirs, transform):
+    train_datasets = []
+    val_datasets = []
+    test_datasets = []
+    
+    for data_dir in data_dirs:
+        # Load mean and std from meanStd.csv for each dataset
+        with open(os.path.join(data_dir, "meanStd.csv"), 'r') as f:
+            mean = float(f.readline().strip())
+            std = float(f.readline().strip())
+        
+        # Create transform for this dataset
+        dataset_transform = transforms.Compose([
+            transforms.Resize((256, 256)),
+            transforms.Grayscale(num_output_channels=1),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[mean], std=[std])
+        ])
+        
+        # Create datasets
+        train_datasets.append(CSIDataset(data_dir, "trainLabels.csv", transform=dataset_transform))
+        val_datasets.append(CSIDataset(data_dir, "validationLabels.csv", transform=dataset_transform))
+        test_datasets.append(CSIDataset(data_dir, "testLabels.csv", transform=dataset_transform))
+    
+    # Combine datasets
+    from torch.utils.data import ConcatDataset
+    train_dataset = ConcatDataset(train_datasets)
+    val_dataset = ConcatDataset(val_datasets)
+    test_dataset = ConcatDataset(test_datasets)
+    
+    return train_dataset, val_dataset, test_dataset
+
 def main():
     # Set device
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
     
-    # Set data directory
-    data_dir = "data/DP_LOS/DP_LOS"
+    # Set data directories for both LOS and NLOS
+    data_dirs = ["data/DP_LOS/DP_LOS", "data/DP_NLOS/DP_NLOS"]
     
-    # Load mean and std from meanStd.csv
-    with open(os.path.join(data_dir, "meanStd.csv"), 'r') as f:
-        mean = float(f.readline().strip())
-        std = float(f.readline().strip())
-    
-    # Data transforms for grayscale spectrograms
+    # Create base transform (will be updated per dataset with specific mean/std)
     transform = transforms.Compose([
         transforms.Resize((256, 256)),
-        transforms.Grayscale(num_output_channels=1),  # Ensure grayscale output
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[mean], std=[std])
+        transforms.Grayscale(num_output_channels=1),
     ])
-    train_dataset = CSIDataset(data_dir, "trainLabels.csv", transform=transform)
-    val_dataset = CSIDataset(data_dir, "validationLabels.csv", transform=transform)
-    test_dataset = CSIDataset(data_dir, "testLabels.csv", transform=transform)
     
-    # Create data loaders
-    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
-    test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
+    # Load and combine datasets
+    train_dataset, val_dataset, test_dataset = load_datasets(data_dirs, transform)
+    
+    # Create data loaders with adjusted batch size for combined dataset
+    batch_size = 64  # Increased batch size for combined dataset
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+    
+    print(f"Combined dataset sizes:")
+    print(f"Training samples: {len(train_dataset)}")
+    print(f"Validation samples: {len(val_dataset)}")
+    print(f"Test samples: {len(test_dataset)}")
     
     # Initialize model, criterion, and optimizer
     model = CSINet().to(device)
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=0.001)
     
-    # Train model
+    # Train model with adjusted number of epochs
     train_losses, val_losses = train_model(
-        model, train_loader, val_loader, criterion, optimizer, num_epochs=20, device=device
+        model, train_loader, val_loader, criterion, optimizer, num_epochs=30, device=device
     )
     
     # Plot training curves
     plt.figure(figsize=(10, 6))
     plt.plot(train_losses, label='Training Loss')
     plt.plot(val_losses, label='Validation Loss')
-    plt.title('Training and Validation Loss')
+    plt.title('Training and Validation Loss (Combined LOS+NLOS)')
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
     plt.legend()
@@ -191,7 +222,7 @@ def main():
     plt.close()
     
     # Load best model and evaluate
-    model.load_state_dict(torch.load('best_model.pth'))
+    model.load_state_dict(torch.load('best_model.pth', weights_only=True))  # Added weights_only=True for security
     evaluate_model(model, test_loader, device=device)
 
 if __name__ == "__main__":
