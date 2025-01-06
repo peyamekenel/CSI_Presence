@@ -1,45 +1,42 @@
 # WiFi CSI-Based Presence Detection
 
-This project implements a machine learning system for detecting human presence in indoor environments using WiFi Channel State Information (CSI) data. The system can determine both the presence/absence of people and their location within different rooms.
+This project implements a machine learning system for detecting human presence in indoor environments using WiFi Channel State Information (CSI) data. The system processes CSI amplitude spectrograms to determine whether a space is occupied or not.
 
 ## Features
 
-- Human presence detection using WiFi CSI data
 - Support for both Line-of-Sight (LOS) and Non-Line-of-Sight (NLOS) scenarios
-- High accuracy (92-97%) in presence detection
+- High accuracy presence detection (92% for LOS, 97% for NLOS)
 - Room-level localization capabilities
-- Comprehensive data preprocessing pipeline
-- PyTorch-based CNN model implementation
+- Robust data preprocessing pipeline
+- Parameterized training configuration
+- Comprehensive model evaluation tools
 
 ## Project Structure
 
 ```
-├── data/
-│   ├── DP_LOS/        # Line-of-Sight dataset
-│   └── DP_NLOS/       # Non-Line-of-Sight dataset
-├── train.py           # Basic training script
-├── train_parameterized.py  # Configurable training script
-├── verify_dataset.py  # Dataset verification utility
-└── real_world_preprocessing.md  # Guide for real-world deployment
+.
+ data/                    # Dataset directory
+   ├── DP_LOS/             # Line-of-sight presence detection dataset
+   └── DP_NLOS/            # Non-line-of-sight presence detection dataset
+ train.py                # Main training script
+ train_parameterized.py  # Configurable training script
+ verify_dataset.py       # Dataset integrity verification
+ analyze_dataset.py      # Dataset analysis utilities
 ```
 
-## Dataset Format
+## Dataset
 
-The project uses CSI amplitude spectrograms (256×256 grayscale images) organized in the following structure:
-- Class 0: Unoccupied state
-- Classes 1-5: Presence in different rooms
+The project uses the WiFi CSI dataset containing:
+- DP_LOS: Line-of-sight presence detection dataset (392 CSI amplitude spectrograms)
+- DP_NLOS: Non-line-of-sight presence detection dataset (384 CSI amplitude spectrograms)
 
-Each dataset variant (DP_LOS, DP_NLOS) includes:
-- trainLabels.csv
-- validationLabels.csv
-- testLabels.csv
-- meanStd.csv (normalization parameters)
+Each spectrogram is represented as a 256x256 pixel grayscale image, capturing the CSI amplitude patterns that indicate human presence or absence.
 
 ## Usage
 
-1. Train the model using the parameterized script:
+1. Install dependencies:
 ```bash
-python train_parameterized.py --dataset DP_LOS --epochs 20
+pip install torch torchvision numpy pandas matplotlib seaborn scikit-learn
 ```
 
 2. Verify dataset integrity:
@@ -47,25 +44,39 @@ python train_parameterized.py --dataset DP_LOS --epochs 20
 python verify_dataset.py
 ```
 
-## Model Performance
+3. Train the model:
+```bash
+python train.py
+```
 
-- DP_LOS Dataset: 92% accuracy
-- DP_NLOS Dataset: 97% accuracy
-- Perfect/near-perfect unoccupied state detection
-- Strong room-specific presence detection
+Or use the parameterized version:
+```bash
+python train_parameterized.py --dataset DP_LOS --batch_size 32 --epochs 100
+```
 
-## Real-World Deployment
+## Model Architecture
 
-See `real_world_preprocessing.md` for detailed instructions on:
-- Raw CSI data collection
-- Data preprocessing
-- Spectrogram generation
-- Model deployment
+The system uses a Convolutional Neural Network (CSINet) specifically designed for processing CSI spectrograms. The architecture includes:
+- Multiple convolutional layers for feature extraction
+- Batch normalization for training stability
+- ReLU activation functions
+- Dropout for regularization
+- Fully connected layers for classification
 
-## Requirements
+## Performance
 
-- Python 3.x
-- PyTorch
-- NumPy
-- Pandas
-- Matplotlib
+- LOS Scenario: 92% accuracy
+- NLOS Scenario: 97% accuracy
+- Room-level localization capability
+
+## Real-world Deployment
+
+For real-world applications:
+1. Set up ESP32 devices for CSI data collection
+2. Configure WiFi parameters and sampling rate
+3. Process raw CSI data into spectrograms
+4. Use trained model for real-time presence detection
+
+## License
+
+MIT License
